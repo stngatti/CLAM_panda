@@ -20,7 +20,7 @@ from utils.file_utils import load_pkl, save_pkl
 Image.MAX_IMAGE_PIXELS = 933120000
 
 class WholeSlideImage(object):
-    def __init__(self, path):
+    def __init__(self, path, mask_path=None):
 
         """
         Args:
@@ -32,6 +32,13 @@ class WholeSlideImage(object):
         self.wsi = openslide.open_slide(path)
         self.level_downsamples = self._assertLevelDownsamples()
         self.level_dim = self.wsi.level_dimensions
+
+        self.wsi_mask = None
+        if mask_path is not None:
+            if os.path.exists(mask_path):
+                self.wsi_mask = openslide.open_slide(mask_path)
+            else:
+                print("Mask file {mask_path} not found")
     
         self.contours_tissue = None
         self.contours_tumor = None
@@ -166,20 +173,24 @@ class WholeSlideImage(object):
         
         # Find and filter contours
         contours, hierarchy = cv2.findContours(img_otsu, cv2.RETR_CCOMP, cv2.CHAIN_APPROX_NONE) # Find contours 
-        hierarchy = np.squeeze(hierarchy, axis=(0,))[:, 2:]
-        if filter_params: foreground_contours, hole_contours = _filter_contours(contours, hierarchy, filter_params)  # Necessary for filtering out artifacts
+        if hierarchy is not None:
+            hierarchy = np.squeeze(hierarchy, axis=(0,))[:, 2:]
+            if filter_params: foreground_contours, hole_contours = _filter_contours(contours, hierarchy, filter_params)  # Necessary for filtering out artifacts
 
-        self.contours_tissue = self.scaleContourDim(foreground_contours, scale)
-        self.holes_tissue = self.scaleHolesDim(hole_contours, scale)
+            self.contours_tissue = self.scaleContourDim(foreground_contours, scale)
+            self.holes_tissue = self.scaleHolesDim(hole_contours, scale)
 
-        #exclude_ids = [0,7,9]
-        if len(keep_ids) > 0:
-            contour_ids = set(keep_ids) - set(exclude_ids)
+            #exclude_ids = [0,7,9]
+            if len(keep_ids) > 0:
+                contour_ids = set(keep_ids) - set(exclude_ids)
+            else:
+                contour_ids = set(np.arange(len(self.contours_tissue))) - set(exclude_ids)
+
+            self.contours_tissue = [self.contours_tissue[i] for i in contour_ids]
+            self.holes_tissue = [self.holes_tissue[i] for i in contour_ids]
         else:
-            contour_ids = set(np.arange(len(self.contours_tissue))) - set(exclude_ids)
-
-        self.contours_tissue = [self.contours_tissue[i] for i in contour_ids]
-        self.holes_tissue = [self.holes_tissue[i] for i in contour_ids]
+            self.contours_tissue = []
+            self.holes_tissue = []
 
     def visWSI(self, vis_level=0, color = (0,255,0), hole_color = (0,0,255), annot_color=(255,0,0), 
                     line_thickness=250, max_size=None, top_left=None, bot_right=None, custom_downsample=1, view_slide_only=False,
@@ -239,14 +250,14 @@ class WholeSlideImage(object):
         return img
 
 
-    def createPatches_bag_hdf5(self, save_path, patch_level=0, patch_size=256, step_size=256, save_coord=True, **kwargs):
+    def createPatches_bag_hdf5(self, save_path, save_label_mask_path, patch_level=0, patch_size=256, step_size=256, save_coord=True, **kwargs):
         contours = self.contours_tissue
         contour_holes = self.holes_tissue
 
         print("Creating patches for: ", self.name, "...",)
         elapsed = time.time()
         for idx, cont in enumerate(contours):
-            patch_gen = self._getPatchGenerator(cont, idx, patch_level, save_path, patch_size, step_size, **kwargs)
+            patch_gen = self._getPatchGenerator(cont, idx, patch_level, save_path, save_label_mask_path, patch_size, step_size, **kwargs)
             
             if self.hdf5_file is None:
                 try:
@@ -256,7 +267,7 @@ class WholeSlideImage(object):
                 except StopIteration:
                     continue
 
-                file_path = initialize_hdf5_bag(first_patch, save_coord=save_coord)
+                file_path, label_mask_path = initialize_hdf5_bag(first_patch, save_coord=save_coord)
                 self.hdf5_file = file_path
 
             for patch in patch_gen:
@@ -265,7 +276,7 @@ class WholeSlideImage(object):
         return self.hdf5_file
 
 
-    def _getPatchGenerator(self, cont, cont_idx, patch_level, save_path, patch_size=256, step_size=256, custom_downsample=1,
+    def _getPatchGenerator(self, cont, cont_idx, patch_level, save_path, save_label_mask_path, patch_size=256, step_size=256, custom_downsample=1,
         white_black=True, white_thresh=15, black_thresh=50, contour_fn='four_pt', use_padding=True):
         start_x, start_y, w, h = cv2.boundingRect(cont) if cont is not None else (0, 0, self.level_dim[patch_level][0], self.level_dim[patch_level][1])
         print("Bounding Box:", start_x, start_y, w, h)
@@ -314,9 +325,16 @@ class WholeSlideImage(object):
 
                 if not self.isInContours(cont_check_fn, (x,y), self.holes_tissue[cont_idx], ref_patch_size[0]): #point not inside contour and its associated holes
                     continue    
-                
+
                 count+=1
-                patch_PIL = self.wsi.read_region((x,y), patch_level, (patch_size, patch_size)).convert('RGB')
+                patch_PIL = self.wsi.read_region((x,y), patch_level, (patch_size, patch_size)).convert('RGB') 
+                
+                label_mask_patch = None #Read corresponding mask if available
+                if self.wsi_mask is not None:
+                    label_mask_patch = self.wsi_mask.read_region((x,y), patch_level, (patch_size, patch_size)).convert('RGB')
+                    if custom_downsample > 1:
+                        label_mask_patch = label_mask_patch.resize((target_patch_size, target_patch_size))
+
                 if custom_downsample > 1:
                     patch_PIL = patch_PIL.resize((target_patch_size, target_patch_size))
                 
@@ -326,11 +344,10 @@ class WholeSlideImage(object):
 
                 patch_info = {'x':x // (patch_downsample[0] * custom_downsample), 'y':y // (patch_downsample[1] * custom_downsample), 'cont_idx':cont_idx, 'patch_level':patch_level, 
                 'downsample': self.level_downsamples[patch_level], 'downsampled_level_dim': tuple(np.array(self.level_dim[patch_level])//custom_downsample), 'level_dim': self.level_dim[patch_level],
-                'patch_PIL':patch_PIL, 'name':self.name, 'save_path':save_path}
+                'patch_PIL':patch_PIL, 'name':self.name, 'save_path':save_path, 'save_label_mask_path':save_label_mask_path}
 
                 yield patch_info
 
-        
         print("patches extracted: {}".format(count))
 
     @staticmethod
@@ -476,6 +493,50 @@ class WholeSlideImage(object):
 
         else:
             return {}, {}
+
+    def process_contours_mask(self, save_path, patch_level=0, patch_size=256, step_size=256, **kwargs):
+        wsi_h5_path = os.path.join(kwargs.get('save_path'), str(self.name) + '.h5')
+        mask_save_path_h5 = os.path.join(save_path, str(self.name) + '.h5')
+    
+        print("Creating mask patches for: ", self.name)
+    
+        if self.wsi_mask is None:
+            print("No mask file available")
+            return None
+    
+        if not os.path.exists(wsi_h5_path):
+            print(f"Error: WSI patches file {wsi_h5_path} not found")
+            return None
+    
+        with h5py.File(wsi_h5_path, 'r') as wsi_file:
+            if 'coords' not in wsi_file:
+                print("No coordinates found in WSI file")
+                return None
+        
+            coords = wsi_file['coords'][:]
+
+            attrs = {} # read attributes from WSI file to save in mask file
+            for attr_name in wsi_file['coords'].attrs.keys():
+                attrs[attr_name] = wsi_file['coords'].attrs[attr_name]
+    
+        print(f"Using {len(coords)} coordinates from WSI file")
+    
+        mask_patches = [] # store mask patches here
+    
+        for i, coord in enumerate(coords):
+            x, y = coord #read the region of the mask
+            mask_patch = np.array(self.wsi_mask.read_region((x, y), patch_level, (patch_size, patch_size)).convert('RGB'))
+            mask_patches.append(mask_patch)
+    
+        if len(mask_patches) > 0:
+            mask_patches = np.array(mask_patches)
+            asset_dict = {'coords': coords, 'imgs': mask_patches}
+            attr_dict = {'coords': attrs}
+        
+            save_hdf5(mask_save_path_h5, asset_dict, attr_dict, mode='w')
+            print(f"Successfully saved {len(mask_patches)} mask patches to {mask_save_path_h5}")
+    
+        return mask_save_path_h5
 
     @staticmethod
     def process_coord_candidate(coord, contour_holes, ref_patch_size, cont_check_fn):

@@ -36,18 +36,26 @@ def patching(WSI_object, **kwargs):
 	### Start Patch Timer
 	start_time = time.time()
 
-	# Patch
-	file_path = WSI_object.process_contours(**kwargs)
+	contours_kwargs = kwargs.copy() # copy the kwargs
+	if 'label_mask_save_dir' in contours_kwargs:
+		del contours_kwargs['label_mask_save_dir']
 
+	# Patch
+	file_path = WSI_object.process_contours(**contours_kwargs)
+
+	if WSI_object.wsi_mask is not None:
+		mask_kwargs = kwargs.copy() # copy the kwargs
+		mask_kwargs['save_path'] = kwargs.get('label_mask_save_dir', os.path.join(kwargs['save_path'], 'label_masks'))
+		mask_file_path = WSI_object.process_contours_mask(**mask_kwargs)
 
 	### Stop Patch Timer
 	patch_time_elapsed = time.time() - start_time
 	return file_path, patch_time_elapsed
 
 
-def seg_and_patch(source, save_dir, patch_save_dir, mask_save_dir, stitch_save_dir, 
+def seg_and_patch(source, label_mask_source_dir, save_dir, patch_save_dir, mask_save_dir, stitch_save_dir, label_mask_save_dir,  
 				  patch_size = 256, step_size = 256, 
-				  seg_params = {'seg_level': -1, 'sthresh': 8, 'mthresh': 7, 'close': 4, 'use_otsu': False,
+				  seg_params = {'seg_level': -1, 'sthresh': 8, 'mthresh': 7, 'close': 4, 'use_otsu': True,
 				  'keep_ids': 'none', 'exclude_ids': 'none'},
 				  filter_params = {'a_t':100, 'a_h': 16, 'max_n_holes':8}, 
 				  vis_params = {'vis_level': -1, 'line_thickness': 500},
@@ -104,7 +112,8 @@ def seg_and_patch(source, save_dir, patch_save_dir, mask_save_dir, stitch_save_d
 
 		# Inialize WSI
 		full_path = os.path.join(source, slide)
-		WSI_object = WholeSlideImage(full_path)
+		mask_path = os.path.join(label_mask_source_dir, slide_id.replace('.tiff', '_mask.tiff'))
+		WSI_object = WholeSlideImage(full_path, mask_path)
 
 		if use_default_params:
 			current_vis_params = vis_params.copy()
@@ -196,7 +205,7 @@ def seg_and_patch(source, save_dir, patch_save_dir, mask_save_dir, stitch_save_d
 		patch_time_elapsed = -1 # Default time
 		if patch:
 			current_patch_params.update({'patch_level': patch_level, 'patch_size': patch_size, 'step_size': step_size, 
-										 'save_path': patch_save_dir})
+										 'save_path': patch_save_dir, 'label_mask_save_dir': label_mask_save_dir})
 			file_path, patch_time_elapsed = patching(WSI_object = WSI_object,  **current_patch_params,)
 		
 		stitch_time_elapsed = -1
@@ -246,6 +255,8 @@ parser.add_argument('--patch_level', type=int, default=0,
 					help='downsample level at which to patch')
 parser.add_argument('--process_list',  type = str, default=None,
 					help='name of list of images to process with parameters (.csv)')
+parser.add_argument('--mask_source', type = str, default=None, 
+					help='path to folder containing mask images')
 
 if __name__ == '__main__':
 	args = parser.parse_args()
@@ -253,6 +264,7 @@ if __name__ == '__main__':
 	patch_save_dir = os.path.join(args.save_dir, 'patches')
 	mask_save_dir = os.path.join(args.save_dir, 'masks')
 	stitch_save_dir = os.path.join(args.save_dir, 'stitches')
+	label_mask_save_dir = os.path.join(args.save_dir, 'label_masks') #patchesof the label mask
 
 	if args.process_list:
 		process_list = os.path.join(args.save_dir, args.process_list)
@@ -261,24 +273,28 @@ if __name__ == '__main__':
 		process_list = None
 
 	print('source: ', args.source)
+	print('label_mask_source', args.mask_source)
 	print('patch_save_dir: ', patch_save_dir)
 	print('mask_save_dir: ', mask_save_dir)
 	print('stitch_save_dir: ', stitch_save_dir)
+	print('label_mask_save_dir: ', label_mask_save_dir) 
 	
 	directories = {'source': args.source, 
+				   'label_mask_source_dir': args.mask_source,
 				   'save_dir': args.save_dir,
 				   'patch_save_dir': patch_save_dir, 
 				   'mask_save_dir' : mask_save_dir, 
-				   'stitch_save_dir': stitch_save_dir} 
+				   'stitch_save_dir': stitch_save_dir,
+				   'label_mask_save_dir': label_mask_save_dir} 
 
 	for key, val in directories.items():
 		print("{} : {}".format(key, val))
-		if key not in ['source']:
+		if key not in ['source', 'label_mask_source_dir']:
 			os.makedirs(val, exist_ok=True)
 
-	seg_params = {'seg_level': -1, 'sthresh': 8, 'mthresh': 7, 'close': 4, 'use_otsu': False,
+	seg_params = {'seg_level': -1, 'sthresh': 5, 'mthresh': 5, 'close': 4, 'use_otsu': True,
 				  'keep_ids': 'none', 'exclude_ids': 'none'}
-	filter_params = {'a_t':100, 'a_h': 16, 'max_n_holes':8}
+	filter_params = {'a_t':50, 'a_h': 16, 'max_n_holes':8}
 	vis_params = {'vis_level': -1, 'line_thickness': 250}
 	patch_params = {'use_padding': True, 'contour_fn': 'four_pt'}
 

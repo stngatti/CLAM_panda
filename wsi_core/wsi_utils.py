@@ -34,7 +34,7 @@ def coord_generator(x_start, x_end, x_step, y_start, y_end, y_step, args_dict=No
                 yield (x,y)
 
 def savePatchIter_bag_hdf5(patch):
-    x, y, cont_idx, patch_level, downsample, downsampled_level_dim, level_dim, img_patch, name, save_path= tuple(patch.values())
+    x, y, cont_idx, patch_level, downsample, downsampled_level_dim, level_dim, img_patch, name, save_path, save_label_mask_path = tuple(patch.values())
     img_patch = np.array(img_patch)[np.newaxis,...]
     img_shape = img_patch.shape
 
@@ -74,17 +74,22 @@ def save_hdf5(output_path, asset_dict, attr_dict= None, mode='a'):
     return output_path
 
 def initialize_hdf5_bag(first_patch, save_coord=False):
-    x, y, cont_idx, patch_level, downsample, downsampled_level_dim, level_dim, img_patch, name, save_path = tuple(first_patch.values())
+    x, y, cont_idx, patch_level, downsample, downsampled_level_dim, level_dim, img_patch, name, save_path, save_label_mask_path = tuple(first_patch.values())
     file_path = os.path.join(save_path, name)+'.h5'
     file = h5py.File(file_path, "w")
     img_patch = np.array(img_patch)[np.newaxis,...]
     dtype = img_patch.dtype
+
+    label_mask_file_path = os.path.join(save_label_mask_path, name)+'.h5'
+    label_mask_file = h5py.File(label_mask_file_path, "w")
 
     # Initialize a resizable dataset to hold the output
     img_shape = img_patch.shape
     maxshape = (None,) + img_shape[1:] #maximum dimensions up to which dataset maybe resized (None means unlimited)
     dset = file.create_dataset('imgs', 
                                 shape=img_shape, maxshape=maxshape,  chunks=img_shape, dtype=dtype)
+    mask_dset = label_mask_file.create_dataset('imgs',
+                                shape=img_shape, maxshape=maxshape, chunks=img_shape, dtype=dtype)
 
     dset[:] = img_patch
     dset.attrs['patch_level'] = patch_level
@@ -93,12 +98,18 @@ def initialize_hdf5_bag(first_patch, save_coord=False):
     dset.attrs['level_dim'] = level_dim
     dset.attrs['downsampled_level_dim'] = downsampled_level_dim
 
+    for attr_key in ['patch_level', 'wsi_name', 'downsample', 'level_dim', 'downsampled_level_dim']:
+        mask_dset.attrs[attr_key] = dset.attrs[attr_key]
+
     if save_coord:
         coord_dset = file.create_dataset('coords', shape=(1, 2), maxshape=(None, 2), chunks=(1, 2), dtype=np.int32)
         coord_dset[:] = (x,y)
+        mask_coord_dset = label_mask_file.create_dataset('coords', shape=(1, 2), maxshape=(None, 2), chunks=(1, 2), dtype=np.int32)
+        mask_coord_dset[:] = (x,y)
 
     file.close()
-    return file_path
+    label_mask_file.close()
+    return file_path, label_mask_file_path
 
 def sample_indices(scores, k, start=0.48, end=0.52, convert_to_percentile=False, seed=1):
     np.random.seed(seed)
