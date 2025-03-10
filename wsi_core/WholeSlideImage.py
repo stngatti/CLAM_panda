@@ -393,19 +393,23 @@ class WholeSlideImage(object):
         print("Total number of contours to process: ", n_contours)
         fp_chunk_size = math.ceil(n_contours * 0.05)
         init = True
+
+        asset_dict = {}
+        attr_dict = {}
+        
         for idx, cont in enumerate(self.contours_tissue):
             if (idx + 1) % fp_chunk_size == fp_chunk_size:
                 print('Processing contour {}/{}'.format(idx, n_contours))
             
             asset_dict, attr_dict = self.process_contour(cont, self.holes_tissue[idx], patch_level, save_path, patch_size, step_size, **kwargs)
             if len(asset_dict) > 0:
-                if init:
+                if init:                  
                     save_hdf5(save_path_hdf5, asset_dict, attr_dict, mode='w')
                     init = False
                 else:
                     save_hdf5(save_path_hdf5, asset_dict, mode='a')
 
-        return self.hdf5_file
+        return self.hdf5_file, asset_dict, attr_dict
 
 
     def process_contour(self, cont, contour_holes, patch_level, save_path, patch_size = 256, step_size = 256,
@@ -494,8 +498,8 @@ class WholeSlideImage(object):
         else:
             return {}, {}
 
-    def process_contours_mask(self, patch_level=0, patch_size=256, step_size=256, **kwargs):
-        wsi_h5_path = os.path.join(kwargs.get('save_path'), str(self.name) + '.h5')
+    def process_contours_mask(self, patch_level=0, patch_size=256, asset_dict=None, attr_dict=None, **kwargs):
+        #wsi_h5_path = os.path.join(kwargs.get('save_path'), str(self.name) + '.h5')
         mask_save_path_h5 = os.path.join(kwargs.get('label_mask_save_dir'), str(self.name) + '.h5')
     
         print("Creating mask patches for: ", self.name)
@@ -504,21 +508,13 @@ class WholeSlideImage(object):
             print("No mask file available")
             return None
     
-        if not os.path.exists(wsi_h5_path):
-            print(f"Error: WSI patches file {wsi_h5_path} not found")
+        if asset_dict is None or 'coords' not in asset_dict or not asset_dict['coords'].size:
+            print("No coordinates available")
             return None
-    
-        with h5py.File(wsi_h5_path, 'r') as wsi_file:
-            if 'coords' not in wsi_file:
-                print("No coordinates found in WSI file")
-                return None
         
-            coords = wsi_file['coords'][:]
+        coords = asset_dict['coords']
+        attrs = attr_dict['coords']
 
-            attrs = {} # read attributes from WSI file to save in mask file
-            for attr_name in wsi_file['coords'].attrs.keys():
-                attrs[attr_name] = wsi_file['coords'].attrs[attr_name]
-    
         print(f"Using {len(coords)} coordinates from WSI file")
     
         mask_patches = [] # store mask patches here

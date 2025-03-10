@@ -37,10 +37,10 @@ def patching(WSI_object, **kwargs):
 	start_time = time.time()
 
 	# Patch
-	file_path = WSI_object.process_contours(**kwargs)
+	file_path, asset_dict, attr_dict = WSI_object.process_contours(**kwargs)
 
 	if WSI_object.wsi_mask is not None:
-		mask_file_path = WSI_object.process_contours_mask(**kwargs)
+		mask_file_path = WSI_object.process_contours_mask(asset_dict=asset_dict, attr_dict=attr_dict, **kwargs)
 
 	### Stop Patch Timer
 	patch_time_elapsed = time.time() - start_time
