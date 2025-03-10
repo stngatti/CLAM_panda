@@ -36,17 +36,11 @@ def patching(WSI_object, **kwargs):
 	### Start Patch Timer
 	start_time = time.time()
 
-	contours_kwargs = kwargs.copy() # copy the kwargs
-	if 'label_mask_save_dir' in contours_kwargs:
-		del contours_kwargs['label_mask_save_dir']
-
 	# Patch
-	file_path = WSI_object.process_contours(**contours_kwargs)
+	file_path = WSI_object.process_contours(**kwargs)
 
 	if WSI_object.wsi_mask is not None:
-		mask_kwargs = kwargs.copy() # copy the kwargs
-		mask_kwargs['save_path'] = kwargs.get('label_mask_save_dir', os.path.join(kwargs['save_path'], 'label_masks'))
-		mask_file_path = WSI_object.process_contours_mask(**mask_kwargs)
+		mask_file_path = WSI_object.process_contours_mask(**kwargs)
 
 	### Stop Patch Timer
 	patch_time_elapsed = time.time() - start_time
@@ -112,7 +106,12 @@ def seg_and_patch(source, label_mask_source_dir, save_dir, patch_save_dir, mask_
 
 		# Inialize WSI
 		full_path = os.path.join(source, slide)
-		mask_path = os.path.join(label_mask_source_dir, slide_id.replace('.tiff', '_mask.tiff'))
+		mask_path = None
+		if label_mask_source_dir is not None:
+			mask_path = os.path.join(label_mask_source_dir, slide_id +'_mask.tiff')
+			if not os.path.isfile(mask_path):
+				mask_path = None
+				print(f"Mask file {mask_path} not found or not a file")
 		WSI_object = WholeSlideImage(full_path, mask_path)
 
 		if use_default_params:

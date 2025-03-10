@@ -409,7 +409,7 @@ class WholeSlideImage(object):
 
 
     def process_contour(self, cont, contour_holes, patch_level, save_path, patch_size = 256, step_size = 256,
-        contour_fn='four_pt', use_padding=True, top_left=None, bot_right=None):
+        contour_fn='four_pt', use_padding=True, top_left=None, bot_right=None, **kwargs):
         start_x, start_y, w, h = cv2.boundingRect(cont) if cont is not None else (0, 0, self.level_dim[patch_level][0], self.level_dim[patch_level][1])
 
         patch_downsample = (int(self.level_downsamples[patch_level][0]), int(self.level_downsamples[patch_level][1]))
@@ -494,9 +494,9 @@ class WholeSlideImage(object):
         else:
             return {}, {}
 
-    def process_contours_mask(self, save_path, patch_level=0, patch_size=256, step_size=256, **kwargs):
+    def process_contours_mask(self, patch_level=0, patch_size=256, step_size=256, **kwargs):
         wsi_h5_path = os.path.join(kwargs.get('save_path'), str(self.name) + '.h5')
-        mask_save_path_h5 = os.path.join(save_path, str(self.name) + '.h5')
+        mask_save_path_h5 = os.path.join(kwargs.get('label_mask_save_dir'), str(self.name) + '.h5')
     
         print("Creating mask patches for: ", self.name)
     
