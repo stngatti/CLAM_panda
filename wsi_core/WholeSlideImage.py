@@ -521,11 +521,11 @@ class WholeSlideImage(object):
     
         for i, coord in enumerate(coords):
             x, y = coord #read the region of the mask
-            mask_patch = np.array(self.wsi_mask.read_region((x, y), patch_level, (patch_size, patch_size)).convert('RGB'))
+            mask_patch = np.array(self.wsi_mask.read_region((x, y), patch_level, (patch_size, patch_size)).convert('L'))
             mask_patches.append(mask_patch)
     
         if len(mask_patches) > 0:
-            mask_patches = np.array(mask_patches)
+            mask_patches = np.array(mask_patches, dtype='uint8')
             asset_dict = {'coords': coords, 'imgs': mask_patches}
             attr_dict = {'coords': attrs}
         
