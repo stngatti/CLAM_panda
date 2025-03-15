@@ -2,6 +2,7 @@
 from wsi_core.WholeSlideImage import WholeSlideImage 
 from wsi_core.wsi_utils import StitchPatches
 from wsi_core.batch_process_utils import initialize_df
+from tqdm import tqdm
 # other imports
 import os
 import numpy as np
@@ -39,7 +40,7 @@ def patching(WSI_object, **kwargs):
 	patch_time_elapsed = time.time() - start_time
 	return file_path, patch_time_elapsed
 
-def seg_and_patch(source, save_dir, patch_save_dir, mask_save_dir, stitch_save_dir, 
+def seg_and_patch(source, label_mask_source_dir, save_dir, patch_save_dir, mask_save_dir, stitch_save_dir, label_mask_save_dir,
 				  patch_size = 256, step_size = 256, custom_downsample=1, 
 				  seg_params = {'seg_level': -1, 'sthresh': 8, 'mthresh': 7, 'close': 4, 'use_otsu': False,
 				  'keep_ids': 'none', 'exclude_ids': 'none'},
@@ -73,7 +74,7 @@ def seg_and_patch(source, save_dir, patch_save_dir, mask_save_dir, stitch_save_d
 	patch_times = 0.
 	stitch_times = 0.
 
-	for i in range(total):
+	for i in tqdm(range(total), desc="Processing Slides", leave=True, ncols=100):
 		df.to_csv(os.path.join(save_dir, 'process_list_autogen.csv'), index=False)
 		idx = process_stack.index[i]
 		slide = process_stack.loc[idx, 'slide_id']
@@ -90,7 +91,12 @@ def seg_and_patch(source, save_dir, patch_save_dir, mask_save_dir, stitch_save_d
 
 		# Inialize WSI
 		full_path = os.path.join(source, slide)
-		WSI_object = WholeSlideImage(full_path)
+		mask_path = None
+		if label_mask_source_dir is not None:
+			mask_path = os.path.join(label_mask_source_dir, slide_id+'_mask.tiff') # mask file should be in tiff format
+			if not os.path.isfile(mask_path):
+				print(f"Mask file {mask_path} not found or not a file")
+		WSI_object = WholeSlideImage(full_path, mask_path=mask_path)
 
 		if use_default_params:
 			current_vis_params = vis_params.copy()
@@ -169,7 +175,7 @@ def seg_and_patch(source, save_dir, patch_save_dir, mask_save_dir, stitch_save_d
 		patch_time_elapsed = -1 # Default time
 		if patch:
 			current_patch_params.update({'patch_level': patch_level, 'patch_size': patch_size, 'step_size': step_size, 
-										 'save_path': patch_save_dir, 'custom_downsample': custom_downsample})
+										 'save_path': patch_save_dir, 'save_label_mask_path': label_mask_save_dir, 'custom_downsample': custom_downsample})
 			file_path, patch_time_elapsed = patching(WSI_object = WSI_object, **current_patch_params)
 		
 		stitch_time_elapsed = -1
@@ -220,6 +226,8 @@ parser.add_argument('--custom_downsample', type= int, choices=[1,2], default=1,
 					help='custom downscale when native downsample is not available (only tested w/ 2x downscale)')
 parser.add_argument('--process_list',  type = str, default=None,
 					help='name of list of images to process with parameters (.csv)')
+parser.add_argument('--mask_source', type=str, default=None,
+					help='path to folder containing label mask files')
 
 if __name__ == '__main__':
 	args = parser.parse_args()
@@ -227,6 +235,7 @@ if __name__ == '__main__':
 	patch_save_dir = os.path.join(args.save_dir, 'patches')
 	mask_save_dir = os.path.join(args.save_dir, 'masks')
 	stitch_save_dir = os.path.join(args.save_dir, 'stitches')
+	label_mask_save_dir = os.path.join(args.save_dir, 'label_masks')
 
 	if args.process_list:
 		process_list = os.path.join(args.save_dir, args.process_list)
@@ -238,20 +247,23 @@ if __name__ == '__main__':
 	print('patch_save_dir: ', patch_save_dir)
 	print('mask_save_dir: ', mask_save_dir)
 	print('stitch_save_dir: ', stitch_save_dir)
+	print('label_mask_save_dir: ', label_mask_save_dir)
 	
 	directories = {'source': args.source, 
+				   'label_mask_source_dir': args.mask_source,
 				   'save_dir': args.save_dir,
 				   'patch_save_dir': patch_save_dir, 
 				   'mask_save_dir' : mask_save_dir, 
-				   'stitch_save_dir': stitch_save_dir} 
+				   'stitch_save_dir': stitch_save_dir,
+				   'label_mask_save_dir': label_mask_save_dir} 
 
 	for key, val in directories.items():
 		print("{} : {}".format(key, val))
-		if key not in ['source']:
+		if key not in ['source', 'label_mask_source_dir']:
 			os.makedirs(val, exist_ok=True)
 
 
-	seg_params = {'seg_level': -1, 'sthresh': 8, 'mthresh': 7, 'close': 4, 'use_otsu': False,
+	seg_params = {'seg_level': -1, 'sthresh': 8, 'mthresh': 7, 'close': 4, 'use_otsu': True,
 				  'keep_ids': 'none', 'exclude_ids': 'none'}
 	filter_params = {'a_t':100, 'a_h': 16, 'max_n_holes':8 }
 	vis_params = {'vis_level': -1, 'line_thickness': 250}

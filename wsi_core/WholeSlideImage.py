@@ -331,7 +331,7 @@ class WholeSlideImage(object):
                 
                 label_mask_patch = None #Read corresponding mask if available
                 if self.wsi_mask is not None:
-                    label_mask_patch = self.wsi_mask.read_region((x,y), patch_level, (patch_size, patch_size)).convert('RGB')
+                    label_mask_patch = self.wsi_mask.read_region((x,y), patch_level, (patch_size, patch_size)).convert('L')
                     if custom_downsample > 1:
                         label_mask_patch = label_mask_patch.resize((target_patch_size, target_patch_size))
 
@@ -402,7 +402,18 @@ class WholeSlideImage(object):
                 print('Processing contour {}/{}'.format(idx, n_contours))
             
             asset_dict, attr_dict = self.process_contour(cont, self.holes_tissue[idx], patch_level, save_path, patch_size, step_size, **kwargs)
+            
             if len(asset_dict) > 0:
+                # Read patches for all coordinates
+                coords = asset_dict['coords']
+                patches = []
+                for coord in coords:
+                    patch = np.array(self.wsi.read_region(coord, patch_level, (patch_size, patch_size)).convert('RGB'))
+                    patches.append(patch)
+                
+                # Add patches to asset dict
+                asset_dict['imgs'] = np.array(patches)
+
                 if init:                  
                     save_hdf5(save_path_hdf5, asset_dict, attr_dict, mode='w')
                     init = False
@@ -519,7 +530,7 @@ class WholeSlideImage(object):
     
         mask_patches = [] # store mask patches here
     
-        for i, coord in enumerate(coords):
+        for coord in coords:
             x, y = coord #read the region of the mask
             mask_patch = np.array(self.wsi_mask.read_region((x, y), patch_level, (patch_size, patch_size)).convert('L'))
             mask_patches.append(mask_patch)

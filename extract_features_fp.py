@@ -88,7 +88,7 @@ if __name__ == '__main__':
 		h5_file_path = os.path.join(args.data_h5_dir, 'patches', bag_name)
 
 		if not os.path.exists(h5_file_path):
-			print(f"File {h5_file_path} not found. Skip this slide.")
+			print(f"File {h5_file_path} not found. Skip this slide.") #skip the slide if the h5 file is not found
 			continue
 
 		slide_file_path = os.path.join(args.data_slide_dir, slide_id+args.slide_ext)
