@@ -291,7 +291,7 @@ if __name__ == '__main__':
 		if key not in ['source', 'label_mask_source_dir']:
 			os.makedirs(val, exist_ok=True)
 
-	seg_params = {'seg_level': -1, 'sthresh': 5, 'mthresh': 5, 'close': 4, 'use_otsu': True,
+	seg_params = {'seg_level': -1, 'sthresh': 3, 'mthresh': 5, 'close': 4, 'use_otsu': True,
 				  'keep_ids': 'none', 'exclude_ids': 'none'}
 	filter_params = {'a_t':50, 'a_h': 16, 'max_n_holes':8}
 	vis_params = {'vis_level': -1, 'line_thickness': 250}
