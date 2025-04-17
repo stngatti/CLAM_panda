@@ -111,8 +111,13 @@ def seg_and_patch(source, label_mask_source_dir, save_dir, patch_save_dir, mask_
 			mask_path = os.path.join(label_mask_source_dir, slide_id +'_mask.tiff')
 			if not os.path.isfile(mask_path):
 				mask_path = None
-				print(f"Mask file {mask_path} not found or not a file")
-		WSI_object = WholeSlideImage(full_path, mask_path)
+				print(f"Mask file not found for {slide_id}")
+		try:
+			WSI_object = WholeSlideImage(full_path, mask_path)
+		except Exception as e:
+			print(f"Errore on loading file {full_path}: {e}. Skip.")
+			df.loc[idx, 'status'] = 'failed_seg'
+			continue
 
 		if use_default_params:
 			current_vis_params = vis_params.copy()
