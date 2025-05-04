@@ -27,7 +27,7 @@ class WholeSlideImage(object):
             path (str): fullpath to WSI file
         """
 
-#         self.name = ".".join(path.split("/")[-1].split('.')[:-1])
+#       self.name = ".".join(path.split("/")[-1].split('.')[:-1])
         self.name = os.path.splitext(os.path.basename(path))[0]
         self.wsi = openslide.open_slide(path)
         self.level_downsamples = self._assertLevelDownsamples()
@@ -392,7 +392,7 @@ class WholeSlideImage(object):
         n_contours = len(self.contours_tissue)
         print("Total number of contours to process: ", n_contours)
         fp_chunk_size = math.ceil(n_contours * 0.05)
-        init = True
+        init = not os.path.isfile(save_path_hdf5)  # se il file esiste, procedi in append
 
         asset_dict = {}
         attr_dict = {}
