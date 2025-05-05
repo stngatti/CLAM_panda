@@ -8,6 +8,7 @@ from models.model_clam import CLAM_MB, CLAM_SB
 from sklearn.preprocessing import label_binarize
 from sklearn.metrics import roc_auc_score, roc_curve
 from sklearn.metrics import auc as calc_auc
+from tqdm import tqdm
 
 device=torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -233,7 +234,8 @@ def train_loop_clam(epoch, model, loader, optimizer, n_classes, bag_weight, writ
     inst_count = 0
 
     print('\n')
-    for batch_idx, (data, label) in enumerate(loader):
+    progress_bar = tqdm(enumerate(loader), total=len(loader), desc=f"Epoch {epoch} [Train]")
+    for batch_idx, (data, label) in progress_bar:
         data, label = data.to(device), label.to(device)
         logits, Y_prob, Y_hat, _, instance_dict = model(data, label=label, instance_eval=True)
 
@@ -256,6 +258,10 @@ def train_loop_clam(epoch, model, loader, optimizer, n_classes, bag_weight, writ
         if (batch_idx + 1) % 20 == 0:
             print('batch {}, loss: {:.4f}, instance_loss: {:.4f}, weighted_loss: {:.4f}, '.format(batch_idx, loss_value, instance_loss_value, total_loss.item()) + 
                 'label: {}, bag_size: {}'.format(label.item(), data.size(0)))
+
+        progress_bar.set_postfix({'bag_loss': f'{loss_value:.4f}',
+                                  'inst_loss': f'{instance_loss_value:.4f}',
+                                  'total_loss': f'{total_loss.item():.4f}'})
 
         error = calculate_error(Y_hat, label)
         train_error += error
@@ -406,8 +412,9 @@ def validate_clam(cur, epoch, model, loader, n_classes, early_stopping = None, w
     prob = np.zeros((len(loader), n_classes))
     labels = np.zeros(len(loader))
     sample_size = model.k_sample
+    progress_bar = tqdm(enumerate(loader), total=len(loader), desc=f"Epoch {epoch} [Val]")
     with torch.inference_mode():
-        for batch_idx, (data, label) in enumerate(loader):
+        for batch_idx, (data, label) in progress_bar:
             data, label = data.to(device), label.to(device)      
             logits, Y_prob, Y_hat, _, instance_dict = model(data, label=label, instance_eval=True)
             acc_logger.log(Y_hat, label)
@@ -425,6 +432,12 @@ def validate_clam(cur, epoch, model, loader, n_classes, early_stopping = None, w
             inst_preds = instance_dict['inst_preds']
             inst_labels = instance_dict['inst_labels']
             inst_logger.log_batch(inst_preds, inst_labels)
+
+            if instance_loss is not None:
+                progress_bar.set_postfix({'bag_loss': f'{loss.item():.4f}',
+                                          'inst_loss': f'{instance_loss_value:.4f}'})
+            else:
+                progress_bar.set_postfix({'bag_loss': f'{loss.item():.4f}'})
 
             prob[batch_idx] = Y_prob.cpu().numpy()
             labels[batch_idx] = label.item()
