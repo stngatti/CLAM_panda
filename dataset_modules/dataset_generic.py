@@ -54,7 +54,7 @@ class Generic_WSI_Classification_Dataset(Dataset):
 		self.num_classes = len(set(self.label_dict.values()))
 		self.seed = seed
 		self.print_info = print_info
-		self.patient_strat = patient_strat
+		self.patient_strat = patient_strat # Store patient_strat setting
 		self.train_ids, self.val_ids, self.test_ids  = (None, None, None)
 		self.data_dir = None
 		if not label_col:
@@ -72,7 +72,16 @@ class Generic_WSI_Classification_Dataset(Dataset):
 
 		self.slide_data = slide_data
 
-		self.patient_data_prep(patient_voting)
+		# Only prepare patient data if patient stratification is enabled
+		if self.patient_strat:
+			#print("Patient stratification enabled, preparing patient data...")
+			self.patient_data_prep(patient_voting)
+		else:
+			#print("Patient stratification disabled.")
+			# Ensure patient_data attribute exists but is None if not used
+			self.patient_data = None
+
+		# Always prepare class IDs (patient IDs only prepared inside if needed)
 		self.cls_ids_prep()
 
 		if print_info:
@@ -80,11 +89,16 @@ class Generic_WSI_Classification_Dataset(Dataset):
 
 	def cls_ids_prep(self):
 		# store ids corresponding each class at the patient or case level
-		self.patient_cls_ids = [[] for i in range(self.num_classes)]		
-		for i in range(self.num_classes):
-			self.patient_cls_ids[i] = np.where(self.patient_data['label'] == i)[0]
+		# Only calculate if patient_strat is True and patient_data exists
+		if self.patient_strat and hasattr(self, 'patient_data') and self.patient_data is not None:
+			self.patient_cls_ids = [[] for i in range(self.num_classes)]
+			for i in range(self.num_classes):
+				self.patient_cls_ids[i] = np.where(self.patient_data['label'] == i)[0]
+		else:
+			# Ensure the attribute exists even if not calculated
+			self.patient_cls_ids = [[] for i in range(self.num_classes)]
 
-		# store ids corresponding each class at the slide level
+		# store ids corresponding each class at the slide level (always needed)
 		self.slide_cls_ids = [[] for i in range(self.num_classes)]
 		for i in range(self.num_classes):
 			self.slide_cls_ids[i] = np.where(self.slide_data['label'] == i)[0]
@@ -364,6 +378,6 @@ class Generic_Split(Generic_MIL_Dataset):
 
 	def __len__(self):
 		return len(self.slide_data)
-		
+
 
 
