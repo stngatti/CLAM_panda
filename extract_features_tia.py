@@ -269,5 +269,3 @@ if __name__ == "__main__":
         device=device,
         wsi_ext=args.wsi_ext
     )
-
-
