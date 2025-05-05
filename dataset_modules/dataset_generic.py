@@ -200,16 +200,47 @@ class Generic_WSI_Classification_Dataset(Dataset):
 			self.train_ids, self.val_ids, self.test_ids = ids
 
 	def get_split_from_df(self, all_splits, split_key='train'):
-		split = all_splits[split_key]
-		split = split.dropna().reset_index(drop=True)
+		split_ids = all_splits[split_key]
+		split_ids = split_ids.dropna().reset_index(drop=True)
 
-		if len(split) > 0:
-			mask = self.slide_data['slide_id'].isin(split.tolist())
+		if len(split_ids) > 0:
+			mask = self.slide_data['slide_id'].isin(split_ids.tolist())
 			df_slice = self.slide_data[mask].reset_index(drop=True)
-			split = Generic_Split(df_slice, data_dir=self.data_dir, num_classes=self.num_classes)
+
+			if self.data_dir: #only if data_dir is not None
+				rows_to_keep = []
+				skipped_count = 0
+				print(f"Verifica esistenza file .pt per lo split '{split_key}'...")
+				for idx, row in df_slice.iterrows():
+					slide_id = row['slide_id']
+					if type(self.data_dir) == dict:
+						source = row['source']
+						current_data_dir = self.data_dir[source]
+					else:
+						current_data_dir = self.data_dir
+
+					pt_path = os.path.join(current_data_dir, 'pt_files', f'{slide_id}.pt')
+					if os.path.exists(pt_path):
+						rows_to_keep.append(idx)
+					else:
+						skipped_count += 1
+
+				if skipped_count > 0:
+					print(f"  Warning: Esclusi {skipped_count} slide dallo split '{split_key}' a causa di file .pt mancanti.")
+
+				df_slice = df_slice.loc[rows_to_keep].reset_index(drop=True)
+
+
+			if len(df_slice) > 0:
+				split = Generic_Split(df_slice, data_dir=self.data_dir, num_classes=self.num_classes)
+				print(f"Split '{split_key}' creato con {len(split)} slide valide.")
+			else:
+				print(f"Warning: Split '{split_key}' è vuoto dopo aver filtrato i file .pt mancanti.")
+				split = None
+
 		else:
 			split = None
-		
+
 		return split
 
 	def get_merged_split_from_df(self, all_splits, split_keys=['train']):
