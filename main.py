@@ -185,6 +185,7 @@ elif args.task == 'panda_isup':
                             seed = args.seed, 
                             print_info = True,
                             label_dict = {i: i for i in range(args.n_classes)},
+                            label_col = 'isup_grade',
                             patient_strat= False,
                             ignore=[])
 

@@ -182,7 +182,8 @@ def train(datasets, cur, args):
         early_stopping = None
     print('Done!')
 
-    for epoch in range(args.max_epochs):
+    epoch_progress_bar = tqdm(range(args.max_epochs), desc=f"Epoch {cur} [Train]")
+    for epoch in epoch_progress_bar:
         if args.model_type in ['clam_sb', 'clam_mb'] and not args.no_inst_cluster:     
             train_loop_clam(epoch, model, train_loader, optimizer, args.n_classes, args.bag_weight, writer, loss_fn)
             stop = validate_clam(cur, epoch, model, val_loader, args.n_classes, 
@@ -193,6 +194,7 @@ def train(datasets, cur, args):
             stop = validate(cur, epoch, model, val_loader, args.n_classes, 
                 early_stopping, writer, loss_fn, args.results_dir)
         
+        epoch_progress_bar.set_postfix_str(f"Epoch {epoch+1}/{args.max_epochs}")      
         if stop: 
             break
 
@@ -234,8 +236,7 @@ def train_loop_clam(epoch, model, loader, optimizer, n_classes, bag_weight, writ
     inst_count = 0
 
     print('\n')
-    progress_bar = tqdm(enumerate(loader), total=len(loader), desc=f"Epoch {epoch} [Train]")
-    for batch_idx, (data, label) in progress_bar:
+    for batch_idx, (data, label) in enumerate(loader):
         data, label = data.to(device), label.to(device)
         logits, Y_prob, Y_hat, _, instance_dict = model(data, label=label, instance_eval=True)
 
@@ -259,9 +260,6 @@ def train_loop_clam(epoch, model, loader, optimizer, n_classes, bag_weight, writ
             print('batch {}, loss: {:.4f}, instance_loss: {:.4f}, weighted_loss: {:.4f}, '.format(batch_idx, loss_value, instance_loss_value, total_loss.item()) + 
                 'label: {}, bag_size: {}'.format(label.item(), data.size(0)))
 
-        progress_bar.set_postfix({'bag_loss': f'{loss_value:.4f}',
-                                  'inst_loss': f'{instance_loss_value:.4f}',
-                                  'total_loss': f'{total_loss.item():.4f}'})
 
         error = calculate_error(Y_hat, label)
         train_error += error
