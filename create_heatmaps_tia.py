@@ -81,6 +81,9 @@ def compute_from_patches(wsi_object, img_transforms, feature_extractor=None, cla
         coords = coords.numpy()
         
         with torch.inference_mode():
+            if roi.dim() == 3:
+                roi = roi.unsqueeze(0) # Trasform [C, H, W] to [1, C, H, W]
+            
             features = feature_extractor(roi)
 
             if attn_save_path is not None and model is not None: # Added check for model
