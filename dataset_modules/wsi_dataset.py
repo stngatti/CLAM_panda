@@ -111,6 +111,7 @@ class Wsi_Region(Dataset):
     def __getitem__(self, idx):
         coord = self.coords[idx]
 
+
         patch_np = self.wsi_object.wsi.read_rect(
             location=tuple(coord), 
             size=self.patch_size, 
