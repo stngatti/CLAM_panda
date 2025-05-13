@@ -3,7 +3,7 @@
 # --- Configurazione ---
 
 # Percorso dello script Python
-PYTHON_SCRIPT_PATH="/home/stino/CLAM_panda/create_heatmaps_tia.py"
+PYTHON_SCRIPT_PATH="/home/fausto/clam_panda/CLAM_panda/create_heatmaps_tia.py"
 
 # Percorso del file di configurazione YAML
 # Assicurati che questo percorso sia corretto e che il file esista.
@@ -11,7 +11,7 @@ CONFIG_FILE="heatmaps/configs/config.yaml"
 
 # (Opzionale) Specifica quali GPU utilizzare (es. "0" per la prima GPU, "0,1" per le prime due)
 # Se non vuoi specificare, puoi commentare questa riga e lo script userà le GPU visibili di default.
- CUDA_VISIBLE_DEVICES="1" 
+CUDA_VISIBLE_DEVICES="1" 
 
 # (Opzionale) Altri argomenti da passare allo script Python, se necessario.
 # Esempio: OVERLAP_VALUE="0.25"
