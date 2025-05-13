@@ -110,7 +110,7 @@ class Wsi_Region(Dataset):
     
     def __getitem__(self, idx):
         coord = self.coords[idx]
-        patch = self.wsi.read_region(tuple(coord), self.level, self.patch_size).convert('RGB')
+        patch = self.wsi.read_region(tuple(coord), self.level, self.patch_size)
         if self.custom_downsample > 1:
             patch = patch.resize(self.target_patch_size)
         patch = self.transforms(patch).unsqueeze(0)

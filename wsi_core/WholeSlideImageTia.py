@@ -21,9 +21,11 @@ class WholeSlideImageTia(WholeSlideImage):
             raise IOError(f"Could not open WSI {path} with Tiatoolbox: {e}")
 
         self.level_downsamples = self._init_level_downsamples()
+        self.level_dim = self._init_level_dimensions()
         
         self.contours_tissue = None
         self.holes_tissue = None 
+        self.contours_tumor = None
 
     def _init_level_dimensions(self):
         if self.wsi and hasattr(self.wsi, 'info') and hasattr(self.wsi.info, 'level_dimensions'):

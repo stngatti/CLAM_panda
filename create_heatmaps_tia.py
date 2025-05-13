@@ -196,7 +196,7 @@ if __name__ == '__main__':
 
     preset = data_args.preset 
     
-    def_filter_params = {'a_t':50.0, 'a_h': 8.0, 'max_n_holes':10}
+    def_filter_params = {'a_t':20.0, 'a_h': 4.0, 'max_n_holes':10}
 
     if preset is not None:
         try:
@@ -248,7 +248,7 @@ if __name__ == '__main__':
     # print('\nckpt path: {}'.format(ckpt_path))
     
     if model_args.initiate_fn == 'initiate_model':
-        model =  initiate_model(model_args_dict, ckpt_path)
+        model =  initiate_model(model_args, ckpt_path)
     else:
         raise NotImplementedError
 
