@@ -22,6 +22,7 @@ class WholeSlideImageTia(WholeSlideImage):
 
         self.level_downsamples = self._init_level_downsamples()
         
+        
         self.contours_tissue = None
         self.holes_tissue = None 
 

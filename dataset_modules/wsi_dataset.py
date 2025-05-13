@@ -3,7 +3,7 @@ import pandas as pd
 import numpy as np
 import time
 import pdb
-import PIL.Image as Image
+from PIL import Image # Assicurati che PIL.Image sia importato
 import h5py
 from torch.utils.data import Dataset
 import torch
@@ -110,8 +110,16 @@ class Wsi_Region(Dataset):
     
     def __getitem__(self, idx):
         coord = self.coords[idx]
-        patch = self.wsi.read_region(tuple(coord), self.level, self.patch_size).convert('RGB')
-        if self.custom_downsample > 1:
-            patch = patch.resize(self.target_patch_size)
-        patch = self.transforms(patch).unsqueeze(0)
+
+        patch_np = self.wsi_object.wsi.read_rect(
+            location=tuple(coord), 
+            size=self.patch_size, 
+            resolution=self.level, 
+            units='level'
+        )
+
+        patch_pil = Image.fromarray(patch_np)
+
+        patch = self.transforms(patch_pil) 
+
         return patch, coord
