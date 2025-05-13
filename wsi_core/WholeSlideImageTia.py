@@ -1,6 +1,6 @@
 import cv2
 import os
-import WholeSlideImage
+from wsi_core.WholeSlideImage import WholeSlideImage
 import numpy as np
 from PIL import Image
 import matplotlib.pyplot as plt

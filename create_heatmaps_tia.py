@@ -15,13 +15,11 @@ from models import get_encoder
 from types import SimpleNamespace
 import h5py
 import yaml
-from wsi_core.batch_process_utils import initialize_df
-# from vis_utils.heatmap_utils import initialize_wsi, drawHeatmap, compute_from_patches # Vecchie importazioni
 from wsi_core.wsi_utils import sample_rois
 from utils.file_utils import save_hdf5
 from tqdm import tqdm
-from PIL import Image # Aggiunto per Image.Resampling
-from scipy.stats import percentileofscore # Decommentare o aggiungere questa riga
+from PIL import Image 
+from scipy.stats import percentileofscore 
 
 from dataset_modules.wsi_dataset import Wsi_Region
 from wsi_core.WholeSlideImageTia import WholeSlideImageTia
@@ -186,56 +184,58 @@ if __name__ == '__main__':
     encoder_args = argparse.Namespace(**args_all['encoder_arguments'])
     exp_args = argparse.Namespace(**args_all['exp_arguments'])
     heatmap_args = argparse.Namespace(**args_all['heatmap_arguments'])
-    sample_args = argparse.Namespace(**args_all['sample_arguments'])
+    if 'sample_arguments' in args_all and args_all['sample_arguments'] is not None:
+        sample_args = argparse.Namespace(**args_all['sample_arguments'])
+    else:
+        sample_args = argparse.Namespace(samples=[]) #define default arguments
     
     patch_size_val = patch_args.patch_size # it's an int
     patch_size = tuple([patch_size_val, patch_size_val]) # convert to tuple
     step_size = tuple((np.array(patch_size) * (1 - patch_args.overlap)).astype(int))
     # print('patch_size: {} x {}, with {:.2f} overlap, step size is {} x {}'.format(patch_size[0], patch_size[1], patch_args.overlap, step_size[0], step_size[1]))
 
-    preset = data_args.preset
-    # Rimuovi 'seg_level' da def_seg_params poiché non verrà utilizzato per la risoluzione della maschera.
-    # Gli altri parametri (sthresh, mthresh, etc.) sono comunque non usati da TIAToolbox per la segmentazione primaria.
-    # 'keep_ids' e 'exclude_ids' sono ancora rilevanti.
-    def_seg_params = {
-        # 'seg_level': -1, # Rimosso
-        'sthresh': 15, 
-        'mthresh': 11, 
-        'close': 2, 
-        'use_otsu': False, 
-        'keep_ids': 'none', 
-        'exclude_ids':'none'
-    }
+    preset = data_args.preset 
+    
     def_filter_params = {'a_t':50.0, 'a_h': 8.0, 'max_n_holes':10}
-    def_vis_params = {'vis_level': -1, 'line_thickness': 250}
-    def_patch_params = {'use_padding': True, 'contour_fn': 'four_pt'}
 
     if preset is not None:
-        preset_df = pd.read_csv(preset)
-        for key in def_seg_params.keys():
-            if key in preset_df.columns: def_seg_params[key] = preset_df.loc[0, key]
-        for key in def_filter_params.keys():
-            if key in preset_df.columns: def_filter_params[key] = preset_df.loc[0, key]
-        for key in def_vis_params.keys():
-            if key in preset_df.columns: def_vis_params[key] = preset_df.loc[0, key]
-        for key in def_patch_params.keys():
-            if key in preset_df.columns: def_patch_params[key] = preset_df.loc[0, key]
+        try:
+            preset_df = pd.read_csv(preset)
+            for key in def_filter_params.keys():
+                if key in preset_df.columns: def_filter_params[key] = preset_df.loc[0, key]
+        except FileNotFoundError:
+            print(f"Warning: Preset file {preset} not found. Default files will be used.")
+        except Exception as e:
+            print(f"Warning: Error while reading {preset}: {e}.")
+
 
     if data_args.process_list is None:
         if isinstance(data_args.data_dir, list):
-            slides = []
+            slides_fnames = []
             for data_dir_item in data_args.data_dir:
-                slides.extend(os.listdir(data_dir_item))
+                slides_fnames.extend(os.listdir(data_dir_item))
         else:
-            slides = sorted(os.listdir(data_args.data_dir))
-        slides = [slide for slide in slides if data_args.slide_ext in slide]
-        df = initialize_df(slides, def_seg_params, def_filter_params, def_vis_params, def_patch_params, use_heatmap_args=False)
+            slides_fnames = sorted(os.listdir(data_args.data_dir))
+        
+        slides_fnames = [s for s in slides_fnames if data_args.slide_ext in s]
+        df = pd.DataFrame({'slide_id': [s.replace(data_args.slide_ext, '') for s in slides_fnames]})
+        df['process'] = 1 
     else:
-        df = pd.read_csv(os.path.join('heatmaps/process_lists', data_args.process_list))
-        df = initialize_df(df, def_seg_params, def_filter_params, def_vis_params, def_patch_params, use_heatmap_args=False)
+        try:
+            df = pd.read_csv(os.path.join('heatmaps/process_lists', data_args.process_list))
+            if 'process' not in df.columns:
+                df['process'] = 1
+        except FileNotFoundError:
+            print(f"Errore: File process_list '{os.path.join('heatmaps/process_lists', data_args.process_list)}' non trovato.")
+            exit()
+        except Exception as e:
+            print(f"Errore durante la lettura del process_list: {e}")
+            exit()
 
     if 'isup_grade' in df.columns and 'label' not in df.columns:
         df['label'] = df['isup_grade']
+    elif 'label' not in df.columns:
+        df['label'] = 'Unspecified' # Fallback
 
     mask_process = df['process'] == 1
     process_stack = df[mask_process].reset_index(drop=True)
@@ -248,34 +248,47 @@ if __name__ == '__main__':
     # print('\nckpt path: {}'.format(ckpt_path))
     
     if model_args.initiate_fn == 'initiate_model':
-        model =  initiate_model(model_args_dict, ckpt_path) # Pass the dictionary
+        model =  initiate_model(model_args_dict, ckpt_path)
     else:
         raise NotImplementedError
 
     feature_extractor, img_transforms = get_encoder(encoder_args.model_name, target_img_size=encoder_args.target_img_size)
-    if feature_extractor is not None: # Added check
+    if feature_extractor is not None:
         _ = feature_extractor.eval()
         feature_extractor = feature_extractor.to(device)
     # print('Done!')
 
-    label_dict =  data_args.label_dict
+    label_dict =  data_args.label_dict if hasattr(data_args, 'label_dict') else {} 
+    if not label_dict: 
+        unique_labels = process_stack['label'].unique()
+        if all(isinstance(x, (int, np.integer)) for x in unique_labels):
+             label_dict = {i: str(i) for i in sorted(unique_labels) if i != 'Unspecified'}
+        else: 
+             label_dict = {label: label for label in unique_labels if label != 'Unspecified'}
+
+
     class_labels = list(label_dict.keys())
-    class_encodings = list(label_dict.values())
-    reverse_label_dict = {class_encodings[i]: class_labels[i] for i in range(len(class_labels))} 
-    
+    class_encodings = list(label_dict.values()) 
+    if all(isinstance(k, int) for k in label_dict.keys()) and all(isinstance(v, str) for v in label_dict.values()):
+        reverse_label_dict = label_dict
+    else: 
+        if all(isinstance(v, (int, np.integer)) for v in label_dict.values()): # Se i valori sono int (es. {"A":0, "B":1})
+            reverse_label_dict = {v: k for k, v in label_dict.items()}
+        else: 
+            unique_df_labels = process_stack['label'].unique()
+            reverse_label_dict = {l: str(l) for l in unique_df_labels}
+
     os.makedirs(exp_args.production_save_dir, exist_ok=True)
     os.makedirs(exp_args.raw_save_dir, exist_ok=True)
     
-    # blocky_wsi_kwargs for compute_from_patches if h5_path does not exist
     blocky_wsi_kwargs = {
         'top_left': None, 'bot_right': None, 
-        'patch_size': patch_size, # This is (patch_size_val, patch_size_val)
-        'step_size': patch_size, # For non-overlapping feature extraction
-        'custom_downsample': patch_args.custom_downsample, # From patch_args
-        'level': patch_args.patch_level,                   # From patch_args
-        'use_center_shift': heatmap_args.use_center_shift  # From heatmap_args
+        'patch_size': patch_size, 
+        'step_size': patch_size, 
+        'custom_downsample': patch_args.custom_downsample, 
+        'level': patch_args.patch_level,                   
+        'use_center_shift': heatmap_args.use_center_shift  
     }
-
 
     for i in tqdm(range(total), desc="Processing Slides"):
         slide_name_from_df = process_stack.loc[i, 'slide_id']
@@ -292,10 +305,10 @@ if __name__ == '__main__':
 
         slide_id = slide_name.replace(data_args.slide_ext, '')
 
-        if not isinstance(label, str):
+        if not isinstance(label, str) and label in reverse_label_dict:
             grouping = reverse_label_dict[label]
         else:
-            grouping = label
+            grouping = str(label)
 
         p_slide_save_dir = os.path.join(exp_args.production_save_dir, exp_args.save_exp_code, str(grouping))
         os.makedirs(p_slide_save_dir, exist_ok=True)
@@ -304,10 +317,18 @@ if __name__ == '__main__':
         os.makedirs(r_slide_save_dir, exist_ok=True)
 
         if heatmap_args.use_roi:
-            x1, x2 = process_stack.loc[i, 'x1'], process_stack.loc[i, 'x2']
-            y1, y2 = process_stack.loc[i, 'y1'], process_stack.loc[i, 'y2']
-            top_left = (int(x1), int(y1))
-            bot_right = (int(x2), int(y2))
+            x1 = process_stack.loc[i].get('x1', None) 
+            x2 = process_stack.loc[i].get('x2', None)
+            y1 = process_stack.loc[i].get('y1', None)
+            y2 = process_stack.loc[i].get('y2', None)
+            if all(v is not None for v in [x1, x2, y1, y2]):
+                top_left = (int(x1), int(y1))
+                bot_right = (int(x2), int(y2))
+            else:
+                top_left = None
+                bot_right = None
+                if heatmap_args.use_roi:
+                    print(f"Attenzione: use_roi è True ma le coordinate ROI non sono definite per {slide_id}. Verrà processata l'intera slide.")
         else:
             top_left = None
             bot_right = None
@@ -317,7 +338,7 @@ if __name__ == '__main__':
 
         if isinstance(data_args.data_dir, str):
             slide_path = os.path.join(data_args.data_dir, slide_name)
-        elif isinstance(data_args.data_dir, list): # Modified to handle list of dirs
+        elif isinstance(data_args.data_dir, list):
             found_slide = False
             for data_dir_item in data_args.data_dir:
                 potential_path = os.path.join(data_dir_item, slide_name)
@@ -328,68 +349,74 @@ if __name__ == '__main__':
             if not found_slide:
                 print(f"Slide {slide_name} not found in any specified data_dir.")
                 continue
-        elif isinstance(data_args.data_dir, dict): # Should not be the case if process_list is None
-            data_dir_key = process_stack.loc[i, data_args.data_dir_key]
-            slide_path = os.path.join(data_args.data_dir[data_dir_key], slide_name)
+        elif isinstance(data_args.data_dir, dict):
+            data_dir_key_col = data_args.data_dir_key 
+            if data_dir_key_col in process_stack.columns:
+                data_dir_key_val = process_stack.loc[i, data_dir_key_col]
+                slide_path = os.path.join(data_args.data_dir[data_dir_key_val], slide_name)
+            else:
+                print(f"Errore: data_dir_key '{data_dir_key_col}' non trovato nel DataFrame per {slide_id}.")
+                continue
         else:
-            raise NotImplementedError
+            raise NotImplementedError("data_args.data_dir deve essere una stringa, lista o dizionario.")
+
 
         mask_file_path = os.path.join(r_slide_save_dir, slide_id+'_mask.pkl')
         
-        current_seg_params = def_seg_params.copy()
         current_filter_params = def_filter_params.copy()
-        current_vis_params = def_vis_params.copy()
+        # Sovrascrivi filter_params dal CSV se presenti
+        current_filter_params = load_params(process_stack.loc[i], current_filter_params) 
 
-        current_seg_params = load_params(process_stack.loc[i], current_seg_params)
-        current_filter_params = load_params(process_stack.loc[i], current_filter_params)
-        current_vis_params = load_params(process_stack.loc[i], current_vis_params)
+        keep_ids_val_str = str(process_stack.loc[i].get('keep_ids', 'none'))
+        exclude_ids_val_str = str(process_stack.loc[i].get('exclude_ids', 'none'))
+
+        seg_params_for_init = {
+            'keep_ids': np.array(keep_ids_val_str.split(',')).astype(int) if len(keep_ids_val_str) > 0 and keep_ids_val_str != 'none' else [],
+            'exclude_ids': np.array(exclude_ids_val_str.split(',')).astype(int) if len(exclude_ids_val_str) > 0 and exclude_ids_val_str != 'none' else []
+        }
         
-        keep_ids_str = str(current_seg_params.get('keep_ids', 'none')) 
-        current_seg_params['keep_ids'] = np.array(keep_ids_str.split(',')).astype(int) if len(keep_ids_str) > 0 and keep_ids_str != 'none' else []
-        exclude_ids_str = str(current_seg_params.get('exclude_ids', 'none')) 
-        current_seg_params['exclude_ids'] = np.array(exclude_ids_str.split(',')).astype(int) if len(exclude_ids_str) > 0 and exclude_ids_str != 'none' else []
-
         # print('Initializing WSI object')
         wsi_object = initialize_wsi_for_tia(slide_path, seg_mask_path=mask_file_path, 
-                                       seg_params=current_seg_params, 
+                                       seg_params=seg_params_for_init, 
                                        filter_params=current_filter_params)
         # print('Done initializing WSI object!')
 
-        # Determine the reference downsample for vis_patch_size
-        # patch_args.patch_level is the level at which patch_size is defined (e.g., level 0)
         if patch_args.patch_level < len(wsi_object.level_downsamples):
-            wsi_ref_downsample = wsi_object.level_downsamples[patch_args.patch_level] # (dx, dy)
+            wsi_ref_downsample = wsi_object.level_downsamples[patch_args.patch_level]
         else:
-            # print(f"Warning: patch_level {patch_args.patch_level} is out of bounds. Using level 0 downsamples.")
-            wsi_ref_downsample = (1.0, 1.0) # Fallback to level 0
+            wsi_ref_downsample = (1.0, 1.0) 
 
-        # vis_patch_size is the patch size at level 0, used by visHeatmap
-        # patch_size is (patch_val, patch_val)
-        # custom_downsample in patch_args is for extraction, not for heatmap visualization.
-        vis_patch_size_for_heatmap = patch_size # patch_size is already (patch_val, patch_val) at level 0
+        vis_patch_size_for_heatmap = patch_size 
 
         block_map_h5_path = os.path.join(r_slide_save_dir, '{}_blockmap.h5'.format(slide_id))
         mask_jpg_path = os.path.join(r_slide_save_dir, '{}_mask.jpg'.format(slide_id))
         
-        # Save the displayed mask
         if not os.path.isfile(mask_jpg_path):
-            mask_img = wsi_object.visWSI(**current_vis_params, number_contours=True)
+            vis_level_for_mask = int(process_stack.loc[i].get('vis_level_mask', heatmap_args.vis_level if heatmap_args.vis_level >=0 else 0))
+            line_thickness_for_mask = int(process_stack.loc[i].get('line_thickness_mask', 250))
+            
+            vis_params_for_mask = {
+                'vis_level': vis_level_for_mask,
+                'line_thickness': line_thickness_for_mask,
+                'custom_downsample': heatmap_args.custom_downsample
+            }
+            mask_img = wsi_object.visWSI(**vis_params_for_mask, number_contours=True)
             mask_img.save(mask_jpg_path)
         
         features_pt_path = os.path.join(r_slide_save_dir, slide_id+'.pt')
-        features_h5_path = os.path.join(r_slide_save_dir, slide_id+'.h5') # For compute_from_patches
+        features_h5_path = os.path.join(r_slide_save_dir, slide_id+'.h5') 
 
         if not os.path.isfile(features_pt_path):
             if not os.path.isfile(features_h5_path):
                 # print(f"H5 file not found at {features_h5_path}, computing features...")
                 _, features_h5_path, wsi_object = compute_from_patches(
                     wsi_object=wsi_object, 
-                    model=model, # Pass the CLAM model if needed for attention in compute_from_patches
+                    model=model, 
                     feature_extractor=feature_extractor, 
                     img_transforms=img_transforms,
                     batch_size=exp_args.batch_size, 
-                    **blocky_wsi_kwargs, # Use parameters for grid extraction
-                    attn_save_path=None, # Do not save attention here, only features
+                    **blocky_wsi_kwargs,
+                    attn_save_path=None, 
                     feat_save_path=features_h5_path
                 )
             
@@ -543,11 +570,15 @@ if __name__ == '__main__':
         if heatmap_args.use_ref_scores: # If True, scores are already percentiles or raw as desired
             heatmap_vis_args['convert_to_percentiles'] = False 
 
+        vis_level_for_heatmap_name = heatmap_args.vis_level
+        if vis_level_for_heatmap_name < 0: # Se -1, usa un default o il livello della maschera
+            vis_level_for_heatmap_name = vis_params_for_mask.get('vis_level',0) # Fallback a 0 se non definito
+
         heatmap_prod_save_name = '{}_{}_roi_{}_blur_{}_rs_{}_bc_{}_a_{}_l_{}_bi_{}_{}.{}'.format(
             slide_id, float(patch_args.overlap), int(heatmap_args.use_roi),
             int(heatmap_args.blur), int(heatmap_args.use_ref_scores), 
             int(heatmap_args.blank_canvas), float(heatmap_args.alpha), 
-            int(heatmap_args.vis_level if heatmap_args.vis_level >=0 else current_vis_params['vis_level']), # Use the actual vis_level
+            int(vis_level_for_heatmap_name), # Usa il valore determinato
             int(heatmap_args.binarize), float(heatmap_args.binary_thresh), heatmap_args.save_ext
         )
         heatmap_prod_path = os.path.join(p_slide_save_dir, heatmap_prod_save_name)
@@ -571,7 +602,8 @@ if __name__ == '__main__':
         
         # Save the original WSI image if requested
         if heatmap_args.save_orig:
-            orig_vis_level = heatmap_args.vis_level if heatmap_args.vis_level >= 0 else current_vis_params['vis_level']
+            # Usa heatmap_args.vis_level per l'immagine originale salvata, o un default
+            orig_vis_level = heatmap_args.vis_level if heatmap_args.vis_level >= 0 else 0 # Default a 0 se -1
             orig_save_name = f'{slide_id}_orig_lv{int(orig_vis_level)}.{heatmap_args.save_ext}'
             orig_save_path = os.path.join(p_slide_save_dir, orig_save_name)
             if not os.path.isfile(orig_save_path):
