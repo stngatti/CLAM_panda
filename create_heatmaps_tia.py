@@ -171,7 +171,7 @@ def parse_config_dict(current_args, config_dict_from_yaml):
     return config_dict_from_yaml
 
 if __name__ == '__main__':
-    config_path = os.path.join('heatmaps/configs', args.config_file)
+    config_path = args.config_file
     config_dict_yaml = yaml.safe_load(open(config_path, 'r'))
     config_dict_parsed = parse_config_dict(args, config_dict_yaml)
 

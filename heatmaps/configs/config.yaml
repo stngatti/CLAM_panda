@@ -14,11 +14,11 @@ exp_arguments:
 
 data_arguments:
   # where is data stored; can be a single str path or a dictionary of key, data_dir mapping
-  data_dir: /home/media/
+  data_dir: /media/data_disk/tiling_panda/train_images
   # column name for key in data_dir (if a dict mapping is used)
   data_dir_key: slide_id
-  # csv list containing slide_ids (can additionally have seg/patch paramters, class labels, etc
-  process_list: dataset_csv/visual_heatmaps.csv
+  # csv list containing slide_ids (can additionally have seg/patch paramters, class labels in heatmaps/process_list/
+  process_list: visual_heatmaps.csv
   # preset file for segmentation/patching
   preset: presets/bwh_biopsy.csv
   # extension of the slide files (e.g., .svs, .tiff)
@@ -45,7 +45,7 @@ encoder_arguments:
 
 model_arguments:
   # arguments for initializing model from checkpoint
-  ckpt_path: ./results/panda_isup_k5_seed42_s42/final_model_fold0.pt
+  ckpt_path: /home/fausto/clam_panda/CLAM_panda/results/panda_isup_k10_seed42_s42/s_9_checkpoint.pt
   model_type: clam_sb
   initiate_fn: initiate_model
   model_size: small
@@ -71,3 +71,11 @@ heatmap_arguments:
   calc_heatmap: true
   # Colormap per la heatmap
   cmap: jet
+
+sample_arguments:
+  samples:
+    - name: "topk_high_attention"
+      sample: true
+      seed: 1
+      k: 15 # save top-k patches
+      mode: topk
