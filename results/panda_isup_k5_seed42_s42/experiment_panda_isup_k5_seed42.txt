@@ -1,0 +1,20 @@
+{'num_splits': 5, 'k_start': -1, 'k_end': -1, 'task': 'panda_isup', 'max_epochs': 50, 'results_dir': './results', 'lr': 0.0002, 'experiment': 'panda_isup_k5_seed42', 'reg': 1e-05, 'label_frac': 1.0, 'bag_loss': 'ce', 'seed': 42, 'model_type': 'clam_sb', 'model_size': 'small', 'use_drop_out': 0.25, 'weighted_sample': True, 'opt': 'adam', 'bag_weight': 0.7, 'inst_loss': 'ce', 'B': 8, 'split_dir': 'splits/panda_isup_100'}
+
+Val Set, val_loss: 1.0799, val_error: 0.4071, auc: 0.8867
+class 0 clustering acc 1.0: correct 12656/12656
+class 1 clustering acc 0.9980246523388117: correct 12631/12656
+class 0: acc 0.9097222222222222, correct 393/432
+class 1: acc 0.4080604534005038, correct 162/397
+class 2: acc 0.5527638190954773, correct 110/199
+class 3: acc 0.15591397849462366, correct 29/186
+class 4: acc 0.6129032258064516, correct 114/186
+class 5: acc 0.7142857142857143, correct 130/182
+EarlyStopping counter: 3 out of 20
+Val error: 0.3559, ROC AUC: 0.9020
+Test error: 0.3566, ROC AUC: 0.8998
+class 0: acc 0.9053117782909931, correct 392/433
+class 1: acc 0.6140350877192983, correct 245/399
+class 2: acc 0.5572139303482587, correct 112/201
+class 3: acc 0.5161290322580645, correct 96/186
+class 4: acc 0.3315508021390374, correct 62/187
+class 5: acc 0.6304347826086957, correct 116/184
