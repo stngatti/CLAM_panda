@@ -92,18 +92,14 @@ class Wsi_Region(Dataset):
             if len(coord_results) > 0:
                 filtered_coords.append(coord_results['coords'])
         
-        if len(filtered_coords) > 0:
-            self.coords = np.vstack(filtered_coords)
-        else:
-            # print(f"Warning: No valid coordinates found for WSI {wsi_object.name} with current patching parameters.")
-            self.coords = np.empty((0, 2), dtype=np.int32) # Crea un array vuoto con la forma corretta
+        coords=np.vstack(filtered_coords)
 
-        if t is not None:
-            # apply transformation
-            assert t is not None, 'transformations not provided'
-            self.transforms = t
-        else:
-            self.transforms = transforms.Compose([transforms.ToTensor()])
+        self.coords = coords
+        print('filtered a total of {} coordinates'.format(len(self.coords)))
+        
+        # apply transformation
+        assert t is not None, 'transformations not provided'
+        self.transforms = t
 
     def __len__(self):
         return len(self.coords)
