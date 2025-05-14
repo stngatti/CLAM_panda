@@ -106,21 +106,12 @@ class Wsi_Region(Dataset):
     
     def __getitem__(self, idx):
         coord = self.coords[idx]
+        patch = self.wsi.read_region(tuple(coord), self.level, self.patch_size).convert('RGB')
+        print("DEBUG patch_pil type:", type(patch))
+        print("DEBUG patch_pil mode:", getattr(patch, 'mode', None))
+        print("DEBUG patch_pil size:", getattr(patch, 'size', None))
+        if self.custom_downsample > 1:
+            patch = patch.resize(self.target_patch_size)
+        patch = self.transforms(patch).unsqueeze(0)
+        return patch, coord 
 
-        size_at_level = tuple((np.array(self.patch_size) / np.array(self.ref_downsample)).astype(int))
-
-        patch_pil = self.wsi.read_region(
-            location=tuple(coord),
-            level=self.level,
-            size=size_at_level,
-        )
-
-        if patch_pil.mode != "RGB":
-            patch_pil = patch_pil.convert("RGB")
-
-        target_size = (224, 224)
-        patch_pil = patch_pil.resize(target_size, Image.Resampling.LANCZOS)
-
-        patch = self.transforms(patch_pil)
-
-        return patch, coord
