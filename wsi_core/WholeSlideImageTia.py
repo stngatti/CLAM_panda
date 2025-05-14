@@ -401,31 +401,40 @@ class WholeSlideImageTia(WholeSlideImage):
         final_blended_img = base_img.copy() #copy before applying the heatmap
         if segment and self.contours_tissue:
             tissue_mask_vis = self.get_seg_mask(region_size_vis, scale, use_holes, offset_level0=read_location_level0)
-            # apply the heatmap only where the tissue mask is True
-            # Where there is tissue (tissue_mask_vis == True), apply the blend
             if alpha < 1.0:
-                 final_blended_img[tissue_mask_vis] = cv2.addWeighted(
+                 final_blended_np_array[tissue_mask_vis] = cv2.addWeighted(
                     heatmap_rgb[tissue_mask_vis], alpha, 
                     base_img[tissue_mask_vis], 1 - alpha, 0)
-            else: # alpha = 1.0, show the heatmap on the tissue
-                 final_blended_img[tissue_mask_vis] = heatmap_rgb[tissue_mask_vis]
+            else: 
+                 final_blended_np_array[tissue_mask_vis] = heatmap_rgb[tissue_mask_vis]
         else: 
             if alpha < 1.0:
-                final_blended_img = cv2.addWeighted(heatmap_rgb, alpha, base_img, 1 - alpha, 0)
-            else: # alpha = 1.0, show only the heatmap
-                final_blended_img = heatmap_rgb
-
-        # Resize finale se custom_downsample o max_size
-        w_final, h_final = final_blended_img.size
-        if custom_downsample > 1:
-            final_blended_img = final_blended_img.resize((int(w_final/custom_downsample), int(h_final/custom_downsample)), Image.Resampling.LANCZOS)
+                final_blended_np_array = cv2.addWeighted(heatmap_rgb, alpha, base_img, 1 - alpha, 0)
+            else: 
+                final_blended_np_array = heatmap_rgb
         
-        w_final, h_final = final_blended_img.size # update after custom_downsample
-        if max_size is not None and (w_final > max_size or h_final > max_size):
-            resizeFactor = max_size/w_final if w_final > h_final else max_size/h_final
-        final_blended_img = final_blended_img.resize((int(w_final*resizeFactor), int(h_final*resizeFactor)), Image.Resampling.LANCZOS)
+        # convert to PIL Image
+        final_blended_img_pil = Image.fromarray(final_blended_np_array)
+
+        # use final_blended_img_pil for resizing
+        current_img_to_process = final_blended_img_pil
+        w_current, h_current = current_img_to_process.size
+
+        if custom_downsample > 1:
+            current_img_to_process = current_img_to_process.resize(
+                (int(w_current / custom_downsample), int(h_current / custom_downsample)),
+                Image.Resampling.LANCZOS
+            )
+            w_current, h_current = current_img_to_process.size # update after resizing
+        
+        if max_size is not None and (w_current > max_size or h_current > max_size):
+            resizeFactor = max_size / w_current if w_current > h_current else max_size / h_current
+            current_img_to_process = current_img_to_process.resize(
+                (int(w_current * resizeFactor), int(h_current * resizeFactor)),
+                Image.Resampling.LANCZOS
+            )
        
-        return final_blended_img
+        return current_img_to_process
 
     def saveSegmentation(self, mask_file_path):
         asset_dict = {'holes': self.holes_tissue, 'tissue': self.contours_tissue}
