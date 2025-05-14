@@ -76,6 +76,8 @@ def compute_from_patches(wsi_object, img_transforms, feature_extractor=None, cla
                 A = A.view(-1, 1).cpu().numpy()
 
                 if ref_scores is not None:
+                    if len(ref_scores.shape) > 1:
+                        ref_scores = ref_scores.flatten()
                     for score_idx in range(len(A)):
                         A[score_idx] = score2percentile(float(A[score_idx][0]), ref_scores)
 
