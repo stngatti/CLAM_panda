@@ -111,15 +111,19 @@ class Wsi_Region(Dataset):
     def __getitem__(self, idx):
         coord = self.coords[idx]
 
-
-        patch_np = self.wsi_object.wsi.read_rect(
-            location=tuple(coord), 
-            size=self.patch_size, 
-            resolution=self.level, 
-            units='level'
+        patch_np = self.wsi.read_region(
+            location=tuple(coord),
+            level=self.level,
+            size=self.ref_size,
         )
 
-        patch_pil = Image.fromarray(patch_np)
+        patch_pil = None
+        if isinstance(patch_np, np.ndarray):
+            # Convert the NumPy array to a PIL Image
+            patch_pil = Image.fromarray(patch_np)
+        elif isinstance(patch_np, Image.Image):
+            # If it's already a PIL Image, you can use it directly
+            patch_pil = patch_np.convert("RGB")  # Ensure it's in RGB mode
 
         patch = self.transforms(patch_pil) 
 
