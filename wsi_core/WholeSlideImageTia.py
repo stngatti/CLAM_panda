@@ -398,7 +398,7 @@ class WholeSlideImageTia(WholeSlideImage):
         cmap_obj = plt.get_cmap(cmap) 
         heatmap_rgb = (cmap_obj(overlay_scores_vis)[..., :3] * 255).astype(np.uint8) # ignore alpha channel
 
-        final_blended_img = base_img.copy() #copy before applying the heatmap
+        final_blended_np_array = base_img.copy()
         if segment and self.contours_tissue:
             tissue_mask_vis = self.get_seg_mask(region_size_vis, scale, use_holes, offset_level0=read_location_level0)
             if alpha < 1.0:
