@@ -81,8 +81,10 @@ def compute_from_patches(wsi_object, img_transforms, feature_extractor=None, cla
         coords = coords.numpy()
         
         with torch.inference_mode():
+            print(f"ROI dim before check: {roi.dim()}") # DEBUG
             if roi.dim() == 3:
                 roi = roi.unsqueeze(0) # Trasform [C, H, W] to [1, C, H, W]
+                print(f"ROI dim after unsqueeze: {roi.dim()}") # DEBUG
             
             features = feature_extractor(roi)
 
@@ -92,7 +94,10 @@ def compute_from_patches(wsi_object, img_transforms, feature_extractor=None, cla
                 if A.size(0) > 1: #CLAM multi-branch attention
                     A = A[clam_pred]
 
-                A = A.view(0, 1).cpu().numpy()
+                if A.dim() == 0:
+                    A = A.unsqueeze(0)
+                
+                A = A.view(-1, 1).cpu().numpy()
 
                 if ref_scores is not None:
                     for score_idx in range(len(A)):
@@ -494,7 +499,7 @@ if __name__ == '__main__':
                                 size=(patch_args.patch_size, patch_args.patch_size), # Desired patch size
                                 resolution=patch_args.patch_level, # Level to which patch_size refers
                                 units='level'
-                            ).convert('RGB')
+                            )
                             patch_img.save(os.path.join(sample_save_dir, f'{patch_idx}_{slide_id}_x_{s_coord[0]}_y_{s_coord[1]}_a_{s_score:.3f}.png'))
                         except Exception as e:
                             print(f"Error reading/saving sampled patch at {s_coord}: {e}")
