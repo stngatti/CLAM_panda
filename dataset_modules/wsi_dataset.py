@@ -107,9 +107,6 @@ class Wsi_Region(Dataset):
     def __getitem__(self, idx):
         coord = self.coords[idx]
         patch = self.wsi.read_region(tuple(coord), self.level, self.patch_size).convert('RGB')
-        print("DEBUG patch_pil type:", type(patch))
-        print("DEBUG patch_pil mode:", getattr(patch, 'mode', None))
-        print("DEBUG patch_pil size:", getattr(patch, 'size', None))
         if self.custom_downsample > 1:
             patch = patch.resize(self.target_patch_size)
         patch = self.transforms(patch).unsqueeze(0)

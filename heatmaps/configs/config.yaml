@@ -71,6 +71,12 @@ heatmap_arguments:
   calc_heatmap: true
   # Colormap per la heatmap
   cmap: jet
+  use_center_shift: true
+  use_roi: false
+  custom_downsample: 1
+  binarize: false
+  # (Opzionale) binary threshold for heatmap
+  binary_thresh: 0.5
 
 sample_arguments:
   samples:

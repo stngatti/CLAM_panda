@@ -23,12 +23,12 @@ data_arguments:
   slide_ext: .tiff
   # label dictionary for str: interger mapping (optional)
   label_dict:
-    0: Non Tumor
-    1: Grade_1
-    2: Grade_2
-    3: Grade_3
-    4: Grade_4
-    5: Grade_5                       
+    Non Tumor: 0
+    Grade_1: 1
+    Grade_2: 2
+    Grade_3: 3
+    Grade_4: 4
+    Grade_5: 5                       
 patching_arguments:
   # arguments for patching
   patch_size: 256
