@@ -11,7 +11,7 @@ CONFIG_FILE="heatmaps/configs/config.yaml"
 
 # (Opzionale) Specifica quali GPU utilizzare (es. "0" per la prima GPU, "0,1" per le prime due)
 # Se non vuoi specificare, puoi commentare questa riga e lo script userà le GPU visibili di default.
-CUDA_VISIBLE_DEVICES="1" 
+CUDA_VISIBLE_DEVICES="0" 
 
 # (Opzionale) Altri argomenti da passare allo script Python, se necessario.
 # Esempio: OVERLAP_VALUE="0.25"

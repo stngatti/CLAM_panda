@@ -3,3 +3,7 @@ __pycache__/
 notebooks
 env.yml
 /output/*
+/results/*
+/splits/*
+/heatmaps/heatmap_raw_results/*
+/heatmaps/heatmap_production_results/HEATMAP_OUTPUT/*
