@@ -7,3 +7,4 @@ env.yml
 /splits/*
 /heatmaps/heatmap_raw_results/*
 /heatmaps/heatmap_production_results/HEATMAP_OUTPUT/*
+/docs/*
